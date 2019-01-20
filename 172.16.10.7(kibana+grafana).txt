@@ -1,0 +1,83 @@
+1.修改open files
+[root@elk ~]#cp /etc/security/limits.d/20-nproc.conf /etc/security/limits.d/20-nproc.conf.bak
+[root@elk ~]#vi /etc/security/limits.d/20-nproc.conf
+#至少为2048
+* soft nproc 2048
+[root@elk ~]#vi /etc/sysctl.conf
+vm.max_map_count=655360
+[root@elk ~]#sysctl -p
+[root@elk ~]# cp /etc/security/limits.conf /etc/security/limits.conf.bak
+[root@elk ~]# vi /etc/security/limits.conf
+* soft nofile 65536
+* hard nofile 131072
+* soft nproc 2048
+* hard nproc 4096
+
+2.创建目录
+[root@es ~]# mkdir -p /server/application
+[root@es ~]# cd /server/application
+#将包全部传到这个目录下
+
+3.关闭Firewalld和seLinux
+setenforce 0
+sed -i 's#SELINUX=enforcing#SELINUX=disabled#' /etc/selinux/config
+systemctl disable firewalld.service
+systemctl stop firewalld.service
+
+4.安装JDK
+#查看Linux自带的JDK是否已安装
+java -version
+#查看JDK信息
+rpm -qa | grep java
+#卸载（有几个卸载几个）
+rpm -e --nodeps java-x.x.x-gcj-compat-x.x.x.x-xxjpp.xxx
+rpm -e --nodeps java-x.x.x-openjdk-x.x.x.x-x.x.bxx.exx
+#安装
+[root@es ~]# cd /server/application/
+[root@es application]# tar xf jdk-8u144-linux-x64.tar.gz
+#配置环境变量
+[root@es application]# vim /etc/profile
+在文件尾部添加如下配置：
+export JAVA_HOME=/server/application/jdk1.8.0_144
+export CLASSPATH=.:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar 
+export PATH=$PATH:$JAVA_HOME/bin
+#生效配置
+source /etc/profile
+#测试
+[root@es jdk1.8.0_144]# java -version
+java version "1.8.0_144"
+Java(TM) SE Runtime Environment (build 1.8.0_144-b01)
+Java HotSpot(TM) 64-Bit Server VM (build 25.144-b01, mixed mode)
+[root@es jdk1.8.0_144]# 
+
+5.安装kibana
+[root@es ~]# cd /server/application/
+[root@es application]# tar xf kibana-5.3.0-linux-x86_64.tar.gz 
+[root@es application]# cd kibana-5.3.0-linux-x86_64/
+[root@es kibana-5.3.0-linux-x86_64]# cd config/
+[root@es config]# cp kibana.yml kibana.yml.bak
+[root@es config]# vim kibana.yml
+[root@es config]# egrep -v "^$|^[#]" kibana.yml
+server.port: 5601
+server.host: "172.16.10.7"
+elasticsearch.url: "http://172.16.10.5:9200"
+kibana.index: ".kibana"
+[root@es ~]# ln -s /server/application/kibana-5.3.0-linux-x86_64/bin/kibana /bin/
+[root@es ~]# /server/application/kibana-5.3.0-linux-x86_64/bin/kibana
+[root@es ~]# cd /etc/systemd/system/
+[root@es system]# vim kibana.service
+[Service]
+ExecStart=/server/application/kibana-5.3.0-linux-x86_64/bin/kibana
+[Install]
+WantedBy=multi-user.target
+[root@es system]# systemctl daemon-reload
+[root@es system]# systemctl enable kibana.service
+
+
+6.安装grafana
+#Redhat & Centos(64 Bit)
+wget https://dl.grafana.com/oss/release/grafana-5.4.2-1.x86_64.rpm 
+[root@es ~]# yum localinstall -y grafana-5.4.2-1.x86_64.rpm 
+[root@es ~]# systemctl enable grafana.service
+[root@es ~]# systemctl start grafana.service
+#浏览器访问http://172.16.10.7:3000
