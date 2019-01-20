@@ -1,0 +1,91 @@
+1.修改open files
+[root@elk ~]#cp /etc/security/limits.d/20-nproc.conf /etc/security/limits.d/20-nproc.conf.bak
+[root@elk ~]#vi /etc/security/limits.d/20-nproc.conf
+#至少为2048
+* soft nproc 2048
+[root@elk ~]#vi /etc/sysctl.conf
+vm.max_map_count=655360
+[root@elk ~]#sysctl -p
+[root@elk ~]# cp /etc/security/limits.conf /etc/security/limits.conf.bak
+[root@elk ~]# vi /etc/security/limits.conf
+* soft nofile 65536
+* hard nofile 131072
+* soft nproc 2048
+* hard nproc 4096
+
+2.创建目录
+[root@es ~]# mkdir -p /server/application
+[root@es ~]# cd /server/application
+#将包全部传到这个目录下
+
+3.关闭Firewalld和seLinux
+setenforce 0
+sed -i 's#SELINUX=enforcing#SELINUX=disabled#' /etc/selinux/config
+systemctl disable firewalld.service
+systemctl stop firewalld.service
+
+4.安装JDK
+#查看Linux自带的JDK是否已安装
+java -version
+#查看JDK信息
+rpm -qa | grep java
+#卸载（有几个卸载几个）
+rpm -e --nodeps java-x.x.x-gcj-compat-x.x.x.x-xxjpp.xxx
+rpm -e --nodeps java-x.x.x-openjdk-x.x.x.x-x.x.bxx.exx
+#安装
+[root@es ~]# cd /server/application/
+[root@es application]# tar xf jdk-8u144-linux-x64.tar.gz
+#配置环境变量
+[root@es application]# vim /etc/profile
+在文件尾部添加如下配置：
+export JAVA_HOME=/server/application/jdk1.8.0_144
+export CLASSPATH=.:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar 
+export PATH=$PATH:$JAVA_HOME/bin
+#生效配置
+source /etc/profile
+#测试
+[root@es jdk1.8.0_144]# java -version
+java version "1.8.0_144"
+Java(TM) SE Runtime Environment (build 1.8.0_144-b01)
+Java HotSpot(TM) 64-Bit Server VM (build 25.144-b01, mixed mode)
+[root@es jdk1.8.0_144]# 
+
+5.安装Redis
+[root@es application]# tar xf redis-4.0.8.tar.gz
+[root@es application]# cd redis-4.0.8/
+[root@es redis-4.0.8]# make PREFIX=/server/application/redis-4.0.8/ install
+[root@es bin]# cd /server/application
+[root@es application]# mkdir -p redis/{run,log,data}
+[root@es application]# cd redis
+[root@es redis]# cp /server/application/redis-4.0.8/bin/redis-server /server/application/redis
+[root@es redis]# cp /server/application/redis-4.0.8/bin/redis-cli /server/application/redis
+[root@es redis]# cp /server/application/redis-4.0.8/redis.conf /server/application/redis
+[root@es application]# cd redis
+[root@es redis]# vim redis.conf 
+#主要修改一下几项：
+logfile "/server/application/redis/redis.log"
+pidfile /server/application/redis/run/redis.pid
+daemonize yes
+port 6379
+bind 0.0.0.0
+dir /server/application/redis/data
+requirepass 123456
+#修改完保存退出
+#启动
+[root@es application]# cd redis
+[root@es redis]# ./redis-server ./redis.conf
+[root@es redis]# netstat -tunlp|grep 6379
+#创建redis命令软连接
+[root@es redis]# ln -s /server/application/redis/redis-cli /usr/bin/redis
+#测试
+[root@es redis]# redis -h 172.16.10.2 -p 6379 -a 123456
+172.16.10.2:6379> ping
+PONG
+172.16.10.2:6379> exit
+#添加开机启动服务
+[root@es ~]# vim/etc/rc.local
+#添加
+/server/application/redis/redis-server /server/application/redis/redis.conf 
+#保存退出
+
+
