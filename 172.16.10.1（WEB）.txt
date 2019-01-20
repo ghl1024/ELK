@@ -1,0 +1,234 @@
+1.修改open files
+[root@elk ~]#cp /etc/security/limits.d/20-nproc.conf /etc/security/limits.d/20-nproc.conf.bak
+[root@elk ~]#vi /etc/security/limits.d/20-nproc.conf
+#至少为2048
+* soft nproc 2048
+[root@elk ~]#vi /etc/sysctl.conf
+vm.max_map_count=655360
+[root@elk ~]#sysctl -p
+[root@elk ~]# cp /etc/security/limits.conf /etc/security/limits.conf.bak
+[root@elk ~]# vi /etc/security/limits.conf
+* soft nofile 65536
+* hard nofile 131072
+* soft nproc 2048
+* hard nproc 4096
+
+2.创建目录
+[root@es ~]# mkdir -p /server/application
+[root@es ~]# cd /server/application
+#将包全部传到这个目录下
+
+
+3.关闭Firewalld和seLinux
+setenforce 0
+sed -i 's#SELINUX=enforcing#SELINUX=disabled#' /etc/selinux/config
+systemctl disable firewalld.service
+systemctl stop firewalld.service
+
+4.安装nginx
+[root@es application]# yum install -y nginx
+[root@es ~]# cd /etc/nginx/
+[root@es nginx]# cp nginx.conf nginx.conf.bak
+[root@es nginx]# vim nginx.conf
+（在http模块下添加）
+log_format json '{"@timestamp":"$time_iso8601",'
+             '"@version":"1",'
+             '"client":"$remote_addr",'
+             '"url":"$uri",'
+             '"status":"$status",'
+             '"domian":"$host",'
+             '"host":"$server_addr",'
+             '"size":"$body_bytes_sent",'
+             '"responsetime":"$request_time",'
+             '"referer":"$http_referer",'
+             '"ua":"$http_user_agent"'
+          '}';
+#修改access_log的输出格式为刚才定义的json 
+access_log  logs/elk.access.log  json;
+[root@es nginx]# nginx -t
+[root@es nginx]# systemctl start nginx.service 
+[root@es nginx]# systemctl enable nginx.service
+
+5.安装JDK
+#查看Linux自带的JDK是否已安装
+java -version
+#查看JDK信息
+rpm -qa | grep java
+#卸载（有几个卸载几个）
+rpm -e --nodeps java-x.x.x-gcj-compat-x.x.x.x-xxjpp.xxx
+rpm -e --nodeps java-x.x.x-openjdk-x.x.x.x-x.x.bxx.exx
+#安装
+[root@es ~]# cd /server/application/
+[root@es application]# tar xf jdk-8u144-linux-x64.tar.gz
+#配置环境变量
+[root@es application]# vim /etc/profile
+在文件尾部添加如下配置：
+export JAVA_HOME=/server/application/jdk1.8.0_144
+export CLASSPATH=.:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar 
+export PATH=$PATH:$JAVA_HOME/bin
+#生效配置
+source /etc/profile
+#测试
+[root@es jdk1.8.0_144]# java -version
+java version "1.8.0_144"
+Java(TM) SE Runtime Environment (build 1.8.0_144-b01)
+Java HotSpot(TM) 64-Bit Server VM (build 25.144-b01, mixed mode)
+[root@es jdk1.8.0_144]# 
+
+
+6.安装tomcat
+[root@es ~]# cd /server/application/
+[root@es ~]# tar xf apache-tomcat-8.0.27.tar.gz
+[root@es ~]# cd apache-tomcat-8.0.27/bin/
+[root@es bin]# ./startup.sh
+[root@es bin]# netstat -tunlp|grep 8080
+tcp6       0      0 :::8080                 :::*                    LISTEN      1655/java
+[root@es bin]# vim /etc/rc.local
+/server/application/apache-tomcat-8.0.27/bin/startup.sh 
+#保存退出
+
+7.安装logstash
+[root@es ~]# cd /server/application/
+[root@es application]# tar xf logstash-5.3.0.tar.gz
+[root@es application]# cd /server/application/logstash-5.3.0/
+[root@es application]# cd /etc/systemd/system
+[root@es application]# vim /etc.rc.local
+/server/application/logstash-5.3.0/bin/logstash -f /server/application/logstash-5.3.0/conf.d/full.conf
+[root@es logstash-5.3.0]# ln -s /server/application/logstash-5.3.0/bin/logstash /sbin/
+[root@es logstash-5.3.0]# mkdir -p /server/application/logstash-5.3.0/conf.d
+[root@es logstash-5.3.0]# cd /server/application/logstash-5.3.0/conf.d
+[root@es conf.d]# vim full.conf
+input {
+    file {
+        path => "/var/log/nginx/access.log"
+        type => "nginx-access"
+        start_position => "beginning"
+        stat_interval => "2"
+        }
+    file {
+        path => "/var/log/nginx/error.log"
+        type => "nginx-error"
+        start_position => "beginning"
+        stat_interval => "2"
+        }		
+    file {
+        path => "/var/log/messages"
+        type => "system"
+        start_position => "beginning"
+        stat_interval => "2"
+        }
+    file {
+        path => "/var/log/secure"
+        type => "secure"
+        start_position => "beginning"
+        stat_interval => "2"
+        }
+    file {
+        path => "/server/application/apache-tomcat-8.0.27/logs/catalina.out"
+        type => "tomcat"
+        start_position => "beginning"
+        stat_interval => "2"
+        }
+    file {
+        path => "/var/log/mariadb/slow.log"
+        type => "mariadb"
+        start_position => "beginning"
+        stat_interval => "2"
+        }		
+    file {
+        path => "/var/log/boot.log"
+        type => "boot"
+        start_position => "beginning"
+        stat_interval => "2"
+        }
+    file {
+        path => "/var/log/yum.log"
+        type => "yum"
+        start_position => "beginning"
+        stat_interval => "2"
+        }				
+    }
+
+output {
+    if [type] == "nginx-access" {
+        redis {
+            host => "172.16.10.2"
+            password => '123456'
+            port => "6379"
+            db => "1"
+            data_type => "list"
+            key => "nginx-access"
+        }
+    }
+    if [type] == "nginx-error" {
+        redis {
+            host => "172.16.10.2"
+            password => '123456'
+            port => "6379"
+            db => "1"
+            data_type => "list"
+            key => "nginx-error" 
+        }
+    }	
+    if [type] == "system" {
+        redis {
+            host => "172.16.10.2"
+            password => '123456'
+            port => "6379"
+            db => "1"
+            data_type => "list"
+            key => "system"
+        }
+    }	
+    if [type] == "secure" {
+        redis {
+            host => "172.16.10.2"
+            password => '123456'
+            port => "6379"
+            db => "1"
+            data_type => "list"
+            key => "secure"
+        }
+    }
+    if [type] == "tomcat" {
+        redis {
+            host => "172.16.10.2"
+            password => '123456'
+            port => "6379"
+            db => "1"
+            data_type => "list"
+            key => "tomcat"
+        }
+    }
+    if [type] == "mariadb" {
+        redis {
+            host => "172.16.10.2"
+            password => '123456'
+            port => "6379"
+            db => "1"
+            data_type => "list"
+            key => "mariadb"
+        }
+    }
+    if [type] == "boot" {
+        redis {
+            host => "172.16.10.2"
+            password => '123456'
+            port => "6379"
+            db => "1"
+            data_type => "list"
+            key => "boot"
+        }
+    }	
+    if [type] == "yum" {
+        redis {
+            host => "172.16.10.2"
+            password => '123456'
+            port => "6379"
+            db => "1"
+            data_type => "list"
+            key => "yum"
+        }
+    }
+}
+
