@@ -1,0 +1,35 @@
+1.修改open files
+[root@elk ~]#cp /etc/security/limits.d/20-nproc.conf /etc/security/limits.d/20-nproc.conf.bak
+[root@elk ~]#vi /etc/security/limits.d/20-nproc.conf
+#至少为2048
+* soft nproc 2048
+[root@elk ~]#vi /etc/sysctl.conf
+vm.max_map_count=655360
+[root@elk ~]#sysctl -p
+[root@elk ~]# cp /etc/security/limits.conf /etc/security/limits.conf.bak
+[root@elk ~]# vi /etc/security/limits.conf
+* soft nofile 65536
+* hard nofile 131072
+* soft nproc 2048
+* hard nproc 4096
+
+2.创建目录
+[root@es ~]# mkdir -p /server/application
+[root@es ~]# cd /server/application
+将包全部传到这个目录下
+[root@es application]# ll
+总用量 1095532
+-rw-r--r--  1 root root  83709983 11月 15 2017 boost_1_59_0.tar.gz
+drwxr-xr-x  9 elk  elk        145 1月   3 15:20 elasticsearch-5.3.0
+-rw-r--r--  1 root root  33696963 3月  15 2018 elasticsearch-5.3.0.tar.gz
+-rw-r--r--  1 root root    907325 3月  28 2018 elasticsearch-head-master.zip
+drwxr-xr-x  8   10  143      4096 7月  22 2017 jdk1.8.0_144
+-rw-r--r--  1 root root 185515842 9月   7 2017 jdk-8u144-linux-x64.tar.gz
+drwxrwxr-x 12 ghl  ghl       4096 3月  23 2017 kibana-5.3.0-linux-x86_64
+-rw-r--r--  1 root root  38912478 3月  15 2018 kibana-5.3.0-linux-x86_64.tar.gz
+drwxr-xr-x 13 root root      4096 1月   3 16:37 logstash-5.3.0
+-rw-r--r--  1 root root  94087323 3月  15 2018 logstash-5.3.0.tar.gz
+-rw-r--r--  1 root root 683233280 11月 13 2017 mysql-5.7.17-linux-glibc2.5-x86_64.tar
+drwxr-xr-x  4 root root       109 1月   4 14:53 redis
+drwxrwxr-x  7 root root      4096 1月   3 14:36 redis-4.0.8
+-rw-r--r--  1 root root   1729973 4月  29 2018 redis-4.0.8.tar.gz
