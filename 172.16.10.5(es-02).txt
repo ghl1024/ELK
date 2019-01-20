@@ -1,0 +1,94 @@
+1.修改open files
+[root@elk ~]#cp /etc/security/limits.d/20-nproc.conf /etc/security/limits.d/20-nproc.conf.bak
+[root@elk ~]#vi /etc/security/limits.d/20-nproc.conf
+#至少为2048
+* soft nproc 2048
+[root@elk ~]#vi /etc/sysctl.conf
+vm.max_map_count=655360
+[root@elk ~]#sysctl -p
+[root@elk ~]# cp /etc/security/limits.conf /etc/security/limits.conf.bak
+[root@elk ~]# vi /etc/security/limits.conf
+* soft nofile 65536
+* hard nofile 131072
+* soft nproc 2048
+* hard nproc 4096
+
+2.创建目录
+[root@es ~]# mkdir -p /server/application
+[root@es ~]# cd /server/application
+#将包全部传到这个目录下
+
+3.关闭Firewalld和seLinux
+setenforce 0
+sed -i 's#SELINUX=enforcing#SELINUX=disabled#' /etc/selinux/config
+systemctl disable firewalld.service
+systemctl stop firewalld.service
+
+4.安装JDK
+#查看Linux自带的JDK是否已安装
+java -version
+#查看JDK信息
+rpm -qa | grep java
+#卸载（有几个卸载几个）
+rpm -e --nodeps java-x.x.x-gcj-compat-x.x.x.x-xxjpp.xxx
+rpm -e --nodeps java-x.x.x-openjdk-x.x.x.x-x.x.bxx.exx
+#安装
+[root@es ~]# cd /server/application/
+[root@es application]# tar xf jdk-8u144-linux-x64.tar.gz
+#配置环境变量
+[root@es application]# vim /etc/profile
+在文件尾部添加如下配置：
+export JAVA_HOME=/server/application/jdk1.8.0_144
+export CLASSPATH=.:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar 
+export PATH=$PATH:$JAVA_HOME/bin
+#生效配置
+source /etc/profile
+#测试
+[root@es jdk1.8.0_144]# java -version
+java version "1.8.0_144"
+Java(TM) SE Runtime Environment (build 1.8.0_144-b01)
+Java HotSpot(TM) 64-Bit Server VM (build 25.144-b01, mixed mode)
+[root@es jdk1.8.0_144]# 
+
+5.安装elasticsearch
+[root@es application]# cd /server/application
+[root@es application]# adduser  -s /bin/bash -c 'elk' -m -d /home/elk elk
+[root@es application]# tar xf elasticsearch-5.3.0.tar.gz 
+[root@es application]# cd elasticsearch-5.3.0/
+[root@es elasticsearch-5.3.0]# mkdir -p ./{data,logs}
+[root@es elasticsearch-5.3.0]# cd config/
+[root@es config]# cp elasticsearch.yml elasticsearch.yml.bak
+[root@es config]# vim elasticsearch.yml
+#修改以下几项
+[elk@es config]$egrep -v "^$|[#]" elasticsearch.yml
+path.data: /server/application/elasticsearch-5.3.0/data
+path.logs: /server/application/elasticsearch-5.3.0/logs
+network.host: 172.16.10.5
+http.port: 9200
+cluster.name: ELK
+node.name: es-02
+discovery.zen.ping.unicast.hosts: ["172.16.10.4", "172.16.10.6"]
+http.cors.enabled: true
+http.cors.allow-origin: "*"
+[root@es config]# chown -R elk.elk /server/application/elasticsearch-5.3.0/
+#启动
+[root@es ~]# su - elk
+[elk@es ~]$ /server/application/elasticsearch-5.3.0/bin/elasticsearch -d
+#时间可能比较长，可查看9200端口是否起来
+#测试出现以下情况，证明elasticsearch可用
+[elk@es ~]$curl 192.168.201.135:9200
+.........
+"tagline" : "You Know, for Search"
+}
+#安装elasticsearch-head
+[root@es ~]# 
+[elk@es ~]$  su - root
+[root@es ~]# vim /etc/rc.local
+#添加
+nohup /server/application/elasticsearch-5.3.0/bin/elasticsearch > /server/application/elasticsearch-5.3.0/logs/es.log 2>&1 &
+[root@es ~]# ln -s /data/application/elasticsearch-5.3.0/bin/elasticsearch /bin/
+#docker加速可参考：https://www.daocloud.io/mirror
+[root@es ~]# docker pull mobz/elasticsearch-head:5
+[root@es ~]# docker run -d -p 9100:9100 --restart=always mobz/elasticsearch-head:5  
+#然后浏览器访问http:172.16.10.5:9100
+
