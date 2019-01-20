@@ -13,7 +13,7 @@
      一台kibana+grafana服务器：172.16.10.7
         （kibana+JDK+grafana）
 ```
-#启动：
+#启动说明：
 ---
 	 按照每个服务器对应的IP去安装,全部安装完成之后再分别启动：
 	 172.16.10.1：/server/application/logstash-5.3.0/bin/logstash -f /server/application/logstash-5.3.0/conf.d/full.conf
