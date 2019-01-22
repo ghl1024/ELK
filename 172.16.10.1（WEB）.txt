@@ -146,7 +146,13 @@ input {
         type => "yum"
         start_position => "beginning"
         stat_interval => "2"
-        }				
+        }
+    file {
+        path => "/var/log/dmesg"
+        type => "dmesg"
+        start_position => "beginning"
+        stat_interval => "2"
+        }			
     }
 
 output {
@@ -228,6 +234,16 @@ output {
             db => "1"
             data_type => "list"
             key => "yum"
+        }
+    }
+    if [type] == "dmesg" {
+        redis {
+            host => "172.16.10.2"
+            password => '123456'
+            port => "6379"
+            db => "1"
+            data_type => "list"
+            key => "dmesg"
         }
     }
 }
