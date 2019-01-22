@@ -134,7 +134,15 @@ input {
         data_type => "list"
         key => 'yum' 
     }
-	
+    redis {
+        type => "dmesg"
+        host => "172.16.10.2"
+        password => '123456'
+        port => "6379"
+        db => "1"
+        data_type => "list"
+        key => 'dmesg' 
+    }	
 }
 
 output {  
@@ -186,5 +194,10 @@ output {
             index => "yum-%{+YYYY.MM.dd}"
         }   
     }
-	
+    if [type] == "dmesg" {
+        elasticsearch {
+            hosts => [172.16.10.4:9200","172.16.10.5:9200","172.16.10.6:9200"]
+            index => "dmesg-%{+YYYY.MM.dd}"
+        }   
+    }	
 }
