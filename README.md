@@ -16,6 +16,9 @@
 #启动说明：
 ---
 	 按照每个服务器对应的IP去安装,全部安装完成之后再分别启动：
-	 172.16.10.1：/server/application/logstash-5.3.0/bin/logstash -f /server/application/logstash-5.3.0/conf.d/full.conf
-	 172.16.10.3: /server/application/logstash-5.3.0/bin/logstash -f /server/application/logstash-5.3.0/conf.d/full.conf
-	 172.16.10.4-6: nohup /server/application/elasticsearch-5.3.0/bin/elasticsearch > /server/application/elasticsearch-5.3.0/logs/es.log 2>&1 &
+	 172.16.10.1：
+	 	/server/application/logstash-5.3.0/bin/logstash -f /server/application/logstash-5.3.0/conf.d/full.conf
+	 172.16.10.3: 
+	 	/server/application/logstash-5.3.0/bin/logstash -f /server/application/logstash-5.3.0/conf.d/full.conf
+	 172.16.10.4-6: 
+	 	nohup /server/application/elasticsearch-5.3.0/bin/elasticsearch > /server/application/elasticsearch-5.3.0/logs/es.log 2>&1 &
